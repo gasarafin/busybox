@@ -20,7 +20,7 @@ BusyBox is a system for displaying availability of a person/room in a WFH (work 
 
 This is the standard implementation of BusyBox. This setup requires at least one server and at least one client to work.
 
-*NOTE: The list of possible devices with prebuilt source code will expand once the new devices I ordered arrive. As for now, these devices were chosen since they were what I had on hand.
+*NOTE: The list of possible devices with prebuilt source code will expand once the new devices I ordered arrive. As for now, these devices were chosen since they were what I had on hand.*
 
 * ### Client
   * Hardware (One of any of the following for each client instance)
