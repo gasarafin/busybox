@@ -5,7 +5,7 @@
 
   Hardware
     - Microcontroller       LilyGo T-Display
-  
+
   Description: This is a painlessMesh client (viewer) for the BusyBox network. This is
   written for an ESP32 device with a screen and will display either the free or busy
   message. The device is not able to change on it's own - it only changes when connected
@@ -25,27 +25,21 @@
 #else
 
 // BusyBox Mesh Network Settings - Change to create private network
-#define MESH_SSID       "BusyBox"
-#define MESH_PASSWORD   "P@ssw0rd"
-#define MESH_PORT       5555
+#define MESH_SSID "BusyBox"
+#define MESH_PASSWORD "P@ssw0rd"
+#define MESH_PORT 5555
 // End BusyBox Mesh Network Settings
 
 #endif
 #endif
 
-Scheduler userScheduler;
 painlessMesh mesh;
 
 TFT_eSPI tft = TFT_eSPI(135, 240);
 
-bool isBusy = false;
+enum status { FreeStatus, BusyStatus, KnockStatus, WaitingStatus };
+int currentState = status::WaitingStatus;
 
-// Sleep Delay
-void espDelay(int ms) {
-    esp_sleep_enable_timer_wakeup(ms * 1000);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-    esp_light_sleep_start();
-}
 
 // Busy Handler
 void busyHandler() {
@@ -54,8 +48,9 @@ void busyHandler() {
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(8);
     tft.drawString("BUSY", tft.width() / 2, tft.height() / 2);
-    isBusy = true;
+    currentState = status::BusyStatus;
 }
+
 
 // Free Handler
 void freeHandler() {
@@ -64,23 +59,41 @@ void freeHandler() {
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(8);
     tft.drawString("FREE", tft.width() / 2, tft.height() / 2);
-    isBusy = false;
+    currentState = status::FreeStatus;
 }
 
-void sendStatusConfirmation() {
-  String msg = String(isBusy);
-  mesh.sendBroadcast( msg );
+
+// Knock Handler
+void knockHandler() {
+    tft.fillScreen(TFT_YELLOW);
+    tft.setTextColor(TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextSize(8);
+    tft.drawString("KNOCK", tft.width() / 2, tft.height() / 2);
+    currentState = status::KnockStatus;
 }
+
+
+void sendStatusConfirmation(uint32_t from) {
+    String msg = String(currentState);
+    mesh.sendSingle(from, msg);
+}
+
 
 void receivedCallback(uint32_t from, String &msg) {
-    if (msg.toInt() == 0) {
-        freeHandler();
-    } else {
-        busyHandler();
+    if (msg.toInt() != currentState) {
+        if (msg.toInt() == 0) {
+            freeHandler();
+        } else if (msg.toInt() == 1) {
+            busyHandler();
+        } else if (msg.toInt() == 2) {
+            knockHandler();
+        }
     }
 
-    sendStatusConfirmation();
+    sendStatusConfirmation(from);
 }
+
 
 void setup() {
     // Screen Init
@@ -93,15 +106,17 @@ void setup() {
 
     // Splash Screen
     tft.pushImage(18, 2, 204, 132, BusyBoxClient);
-    espDelay(4000);
+    delay(4000);
 
     // Uncomment for connection debugging
     // Serial.begin(115200);
     // mesh.setDebugMsgTypes(ERROR | CONNECTION | STARTUP);
 
     // Mesh Init
-    mesh.init(MESH_SSID, MESH_PASSWORD, &userScheduler, MESH_PORT);
+    mesh.init(MESH_SSID, MESH_PASSWORD, MESH_PORT);
     mesh.onReceive(&receivedCallback);
+
+    mesh.setContainsRoot(true);
 
     tft.fillScreen(TFT_BLACK);
     tft.setTextSize(2);
@@ -110,6 +125,7 @@ void setup() {
     tft.drawString("Waiting", tft.width() / 2, tft.height() / 2 - 12);
     tft.drawString("for Init.", tft.width() / 2, tft.height() / 2 + 12);
 }
+
 
 void loop() {
     mesh.update();
