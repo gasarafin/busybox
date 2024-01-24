@@ -1,27 +1,16 @@
 /***************************************************************************************
-  BusyBox Server for LilyGo T-Display S3  (WORK IN PROGRESS)
+  BusyBox Server for LilyGo T-Display S3
 
   Created:   23 Jan 2024
 
   Hardware
     - Microcontroller       LilyGo T-Display S3
   
-  Description: This is a painlessMesh client (viewer) for the BusyBox network. This is
-  written for an ESP32 device with a screen and will display either the free or busy
-  message. The device is not able to change on it's own - it only changes when connected
-  to a BusyBox server device (compatible with any in the server folder). If you are
-  looking for a standalone BusyBox that is only changed locally using the onboard
-  buttons, look in the standalone folder of this project.
-
+  Description: This is a painlessMesh server for the BusyBox network.
  **************************************************************************************/
 
-//TODO Works overall, but not pretty. Must do following:
-// 1. Fix fonts and text spacing
-// 2. Tooltip buttons
-// 3. Hibernate function
-
 #include "TFT_eSPI.h"
-#include "Free_Fonts.h"
+#include "Fonts/GFXFF/gfxfont.h"
 #include "BusyBoxClient.h"
 #include "painlessMesh.h"
 #include <Button2.h>
@@ -73,6 +62,9 @@ void button_init() {
     btn2.setDoubleClickHandler([](Button2 &b) {
         meshHibernate();
     });
+
+    btn1.setDoubleClickTime(500);
+    btn2.setDoubleClickTime(500);
 }
 
 
@@ -88,39 +80,63 @@ void sendMessage() {
 
 
 // Tooltips
-//TODO stubbed from standalone
 void toolTips() {
-    tft.setRotation(1);
-
-    // Set Busy Line
+    tft.setRotation(0);
+    tft.setTextFont(1);
     tft.setTextSize(2);
-    tft.setTextColor(TFT_RED);
-    tft.setTextDatum(TR_DATUM);
-    tft.drawString("Busy -->", tft.width(), 0);
+
+    // Set Divider Line
+    tft.fillRect(0, tft.height() - 40, tft.width(), tft.height(), TFT_LIGHTGREY);
+    tft.drawLine(tft.width() / 2, tft.height(), tft.width() / 2, tft.height() - 40, TFT_BLACK);
+    tft.drawLine(0, tft.height() - 40, tft.width(), tft.height() - 40, TFT_BLACK);
 
     // Set Free Line
-    tft.setTextSize(2);
-    tft.setTextColor(TFT_GREEN);
+    tft.setTextColor(TFT_DARKGREEN);
+    tft.setTextDatum(BL_DATUM);
+    tft.drawString("Free", 0, tft.height() - 20);
+
+    // Set Busy Line
+    tft.setTextColor(TFT_RED);
     tft.setTextDatum(BR_DATUM);
-    tft.drawString("Free -->", tft.width(), tft.height());
-    tft.setRotation(0);
+    tft.drawString("Busy", tft.width(), tft.height() - 20);
+
+    // Set Knock Line
+    tft.setTextColor(TFT_GOLD);
+    tft.setTextDatum(TL_DATUM);
+    tft.drawString("Knock", 0, tft.height() - 20);
+
+    // Set Hibernate Line
+    tft.setTextColor(TFT_BLUE);
+    tft.setTextDatum(TR_DATUM);
+    tft.drawString("Sleep", tft.width(), tft.height() - 20);
+
+    // Set Click Numbers
+    tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+    tft.setTextDatum(BC_DATUM);
+    tft.drawString("(1x)", tft.width() / 2, tft.height() - 20);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("(2x)", tft.width() / 2, tft.height() - 20);
 }
 
 
 void meshHibernate() {
     tft.setRotation(0);
     tft.fillScreen(TFT_WHITE);
+    toolTips();
     tft.fillRect(0, 0, tft.width(), tft.height() / 4, TFT_BLUE);
     tft.setTextColor(TFT_WHITE);
-    tft.setFreeFont(FSB18);
+    tft.setTextSize(1);
+    tft.setFreeFont(&FreeMonoBold24pt7b);
 
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Sleep", tft.width() / 2, tft.height() / 7);
+    tft.drawString("Sleep", tft.width() / 2, tft.height() / 8);
 
     // Not Implemented Message
-    tft.setFreeFont(FS9);
+    tft.setTextColor(TFT_BLACK);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Not Implemented Yet", tft.width() / 2, (tft.height() / 7) * 3);
+    tft.drawString("Not Implemented Yet", tft.width() / 2, (tft.height() / 8) * 3);
     // End Not Implemented Message
 
     currentState = status::HibernateStatus;
@@ -131,18 +147,20 @@ void meshHibernate() {
 void busyHandler() {
     tft.setRotation(0);
     tft.fillScreen(TFT_WHITE);
+    toolTips();
     tft.fillRect(0, 0, tft.width(), tft.height() / 4, TFT_RED);
     tft.setTextColor(TFT_WHITE);
-    tft.setFreeFont(FSB18);
+    tft.setTextSize(1);
+    tft.setFreeFont(&FreeMonoBold24pt7b);
 
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Busy", tft.width() / 2, tft.height() / 7);
+    tft.drawString("Busy", tft.width() / 2, tft.height() / 8);
 
     currentState = status::BusyStatus;
 
     sendMessage();
 
-    meshStatusY = (tft.height() / 4) + 40;
+    meshStatusY = (tft.height() / 4) + 50;
 }
 
 
@@ -150,37 +168,41 @@ void busyHandler() {
 void freeHandler() {
     tft.setRotation(0);
     tft.fillScreen(TFT_WHITE);
+    toolTips();
     tft.fillRect(0, 0, tft.width(), tft.height() / 4, TFT_GREEN);
     tft.setTextColor(TFT_WHITE);
-    tft.setFreeFont(FSB18);
+    tft.setTextSize(1);
+    tft.setFreeFont(&FreeMonoBold24pt7b);
 
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Free", tft.width() / 2, tft.height() / 7);
+    tft.drawString("Free", tft.width() / 2, tft.height() / 8);
 
     currentState = status::FreeStatus;
 
     sendMessage();
 
-    meshStatusY = (tft.height() / 4) + 40;
+    meshStatusY = (tft.height() / 4) + 50;
 }
 
 
-// Free Handler
+// Knock Handler
 void knockHandler() {
     tft.setRotation(0);
     tft.fillScreen(TFT_WHITE);
+    toolTips();
     tft.fillRect(0, 0, tft.width(), tft.height() / 4, TFT_YELLOW);
     tft.setTextColor(TFT_BLACK);
-    tft.setFreeFont(FSB18);
+    tft.setTextSize(1);
+    tft.setFreeFont(&FreeMonoBold24pt7b);
 
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Knock", tft.width() / 2, tft.height() / 7);
+    tft.drawString("Knock", tft.width() / 2, tft.height() / 8);
 
     currentState = status::KnockStatus;
 
     sendMessage();
 
-    meshStatusY = (tft.height() / 4) + 40;
+    meshStatusY = (tft.height() / 4) + 50;
 }
 
 
@@ -193,7 +215,8 @@ void receivedCallback(uint32_t from, String &msg) {
 
 void meshStatusHeader() {
     tft.setTextColor(TFT_BLACK);
-    tft.setFreeFont(FS9);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
 
     tft.setCursor(0, (tft.height() / 4) + 20);
     tft.println("Mesh Status");
@@ -203,12 +226,26 @@ void meshStatusHeader() {
 
 void meshStatusCheck(uint32_t from, String &msg) {
     tft.setTextColor(TFT_BLACK);
-    tft.setFreeFont(FS9);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
 
     tft.setCursor(0, meshStatusY);
     tft.printf("%u: %s", from, statusMessage[msg.toInt()]);
 
     meshStatusY += 10;
+}
+
+
+// Init Splash
+void initSplash() {
+    tft.setRotation(0);
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, tft.width(), tft.height() / 4, TFT_LIGHTGREY);
+    tft.setTextColor(TFT_BLACK);
+    tft.setTextSize(1);
+    tft.setFreeFont(&FreeMonoBold24pt7b);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString("Init", tft.width() / 2, tft.height() / 8);
 }
 
 
@@ -236,12 +273,8 @@ void setup() {
     mesh.init(MESH_SSID, MESH_PASSWORD, MESH_PORT);
     mesh.onReceive(&receivedCallback);
 
-    tft.setRotation(0);
-    tft.fillScreen(TFT_WHITE);
-    tft.setTextColor(TFT_BLACK);
-    tft.setFreeFont(FSB18);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString("Init", tft.width() / 2, tft.height() / 7);
+    initSplash();
+    toolTips();
 }
 
 
